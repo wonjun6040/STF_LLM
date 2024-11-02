@@ -1,11 +1,11 @@
-torchrun --nproc_per_node=2 alpaca_base_train.py \
+torchrun --nproc_per_node=4 alpaca_base_train.py \
     --model_name_or_path "Bllossom/llama-3.2-Korean-Bllossom-3B" \
     --data_path ./alpaca_data.json \
     --bf16 True \
     --output_dir aplaca_base \
     --num_train_epochs 3 \
-    --per_device_train_batch_size 2 \
-    --per_device_eval_batch_size 2 \
+    --per_device_train_batch_size 4 \
+    --per_device_eval_batch_size 4 \
     --gradient_accumulation_steps 8 \
     --evaluation_strategy "no" \
     --save_strategy "steps" \
