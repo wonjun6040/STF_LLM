@@ -98,7 +98,7 @@ def _tokenize_fn(strings: Sequence[str], tokenizer: transformers.PreTrainedToken
         tokenizer(
             text,
             return_tensors="pt",
-            padding="max_length",
+            padding="longest",
             max_length=tokenizer.model_max_length,
             truncation=True,
         )
@@ -193,9 +193,9 @@ def train():
 
     model = transformers.AutoModelForCausalLM.from_pretrained(
         model_args.model_name_or_path,
-        torch_dtype=torch.bfloat16,
+        #torch_dtype=torch.bfloat16,
         # attn_implementation="flash_attention_2",
-        use_cache=False,
+        # use_cache=False,
         cache_dir=training_args.cache_dir,
     )
 
@@ -204,6 +204,8 @@ def train():
         cache_dir=training_args.cache_dir,
         model_max_length=training_args.model_max_length,
         padding_side="right",
+        eos_token = DEFAULT_EOS_TOKEN,
+
         use_fast=False,
     )
     special_tokens_dict = dict()

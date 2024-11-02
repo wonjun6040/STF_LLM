@@ -1,0 +1,13 @@
+
+
+
+{
+
+
+    "fsdp_transformer_layer_cls_to_wrap": "LlamaDecoderLayer",
+    "backward_prefetch": "backward_pre",
+    "forward_prefetch": "false",
+    "use_orig_params": "false"
+
+}
+
