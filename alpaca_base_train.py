@@ -193,9 +193,9 @@ def train():
 
     model = transformers.AutoModelForCausalLM.from_pretrained(
         model_args.model_name_or_path,
-        torch_dtype=torch.bfloat16,
-        attn_implementation="flash_attention_2",
-        use_cache=False,
+        # torch_dtype=torch.bfloat16,
+        # attn_implementation="flash_attention_2",
+        # use_cache=False,
         cache_dir=training_args.cache_dir,
     )
 
