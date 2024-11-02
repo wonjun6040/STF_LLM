@@ -13,7 +13,7 @@ IGNORE_INDEX = -100
 from datasets import load_dataset, concatenate_datasets
 from transformers import Trainer
 from transformers import TrainingArguments
-
+from peft import LoraConfig, PeftConfig, PeftModel, get_peft_model, prepare_model_for_kbit_training, TaskType
 from torch.utils.data import Dataset
 
 
@@ -39,7 +39,7 @@ class TrainingArguments(transformers.TrainingArguments):
     cache_dir: Optional[str] = field(default=None)
     optim: str = field(default="adamw_torch")
     model_max_length: int = field(
-        default=2048,
+        default=1024,
         metadata={"help": "Maximum sequence length. Sequences will be right padded (and possibly truncated)."},
     )
 
@@ -190,13 +190,22 @@ def train():
 
     parser = transformers.HfArgumentParser((ModelArguments, DataArguments, TrainingArguments))
     model_args, data_args, training_args = parser.parse_args_into_dataclasses()
+    bnb_config = BitsAndBytesConfig(
+        load_in_4bit=True,
+        bnb_4bit_quant_type="nf4",
+        bnb_4bit_compute_dtype=torch.bfloat16,
+        bnb_4bit_use_double_quant=True,
+        bnb_4bit_quant_storage=torch.bfloat16,
+    )
+    local_rank = int(os.environ["LOCAL_RANK"])
 
     model = transformers.AutoModelForCausalLM.from_pretrained(
         model_args.model_name_or_path,
-        #torch_dtype=torch.bfloat16,
+        torch_dtype=torch.bfloat16,
         # attn_implementation="flash_attention_2",
-        # use_cache=False,
+        use_cache=False,
         cache_dir=training_args.cache_dir,
+        device_map={"": local_rank}
     )
 
     tokenizer = transformers.AutoTokenizer.from_pretrained(
@@ -205,6 +214,8 @@ def train():
         model_max_length=training_args.model_max_length,
         padding_side="right",
         eos_token = DEFAULT_EOS_TOKEN,
+        pad_token = DEFAULT_PAD_TOKEN,
+        bos_token = DEFAULT_BOS_TOKEN,
 
         use_fast=False,
     )
@@ -215,8 +226,7 @@ def train():
         special_tokens_dict["eos_token"] = DEFAULT_EOS_TOKEN
     if tokenizer.bos_token is None:
         special_tokens_dict["bos_token"] = DEFAULT_BOS_TOKEN
-    if tokenizer.unk_token is None:
-        special_tokens_dict["unk_token"] = DEFAULT_UNK_TOKEN
+
 
     smart_tokenizer_and_embedding_resize(
         special_tokens_dict=special_tokens_dict,
@@ -225,13 +235,24 @@ def train():
     )
     alpaca = load_dataset("tatsu-lab/alpaca", split='train')
 
-    # 양방향 번역 데이터셋 생성
+
 
     koalpaca_1_1 = load_dataset("jojo0217/korean_rlhf_dataset", split='train')
 
     # 결과 확인
     ds = concatenate_datasets([koalpaca_1_1, alpaca]).shuffle(seed=1234)
     data_module = make_supervised_data_module(ds, tokenizer=tokenizer, data_args=data_args)
+    peft_config = LoraConfig(
+        task_type="CAUSAL_LM",  # Or another task type depending on your task
+
+        r=16,  # Number of rank
+        lora_alpha=64,
+        lora_dropout=0.,
+        target_modules=['up_proj', 'down_proj', 'gate_proj', 'k_proj', 'q_proj', 'v_proj', 'o_proj'],
+        bias="none",
+    )
+
+    model = get_peft_model(model, peft_config)
     trainer = Trainer(model=model, tokenizer=tokenizer, args=training_args, **data_module)
     trainer.train()
     trainer.save_state()
